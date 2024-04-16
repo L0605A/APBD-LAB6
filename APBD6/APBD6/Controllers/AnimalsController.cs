@@ -19,14 +19,23 @@ public class AnimalsController : ControllerBase
     }
     
     [HttpGet]
-    public IActionResult GetAnimals()
+    public IActionResult GetAnimals([FromQuery] string orderBy = "name")
     {
+        
+        orderBy = orderBy?.ToLower();
+        
+        if (orderBy != "name" && orderBy != "description" && orderBy != "category" && orderBy != "area")
+        {
+            
+            orderBy = "name";
+        }
+
         using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
 
         using SqlCommand command = new SqlCommand();
         command.Connection = connection;
-        command.CommandText = "SELECT * FROM Animal";
+        command.CommandText = $"SELECT * FROM Animal ORDER BY {orderBy} ASC";
 
         var reader = command.ExecuteReader();
 
@@ -37,7 +46,7 @@ public class AnimalsController : ControllerBase
         int descOrdinal = reader.GetOrdinal("Description");
         int categoryOrdinal = reader.GetOrdinal("Category");
         int areaOrdinal = reader.GetOrdinal("Area");
-        
+
         while (reader.Read())
         {
             animals.Add(new Animal()
@@ -50,8 +59,9 @@ public class AnimalsController : ControllerBase
             });
         }
 
-        return Ok();
+        return Ok(animals);
     }
+
 
     [HttpPost]
     public IActionResult AddAnimal(DTOAnimal addAnimal)
@@ -71,4 +81,70 @@ public class AnimalsController : ControllerBase
         
         return Created();
     }
+    
+    [HttpPut("{idAnimal}")]
+    public IActionResult UpdateAnimal(int idAnimal, [FromBody] DTOAnimal updatedAnimalData)
+    {
+        if (updatedAnimalData == null)
+        {
+            return BadRequest("Updated animal data is required.");
+        }
+
+        using (SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default")))
+        {
+            connection.Open();
+
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = connection;
+                command.CommandText = "UPDATE Animal " +
+                                      "SET Name = @animalName, " +
+                                      "    Description = @animalDesc, " +
+                                      "    Category = @animalCategory, " +
+                                      "    Area = @animalArea " +
+                                      "WHERE IdAnimal = @idAnimal";
+                command.Parameters.AddWithValue("@animalName", updatedAnimalData.Name);
+                command.Parameters.AddWithValue("@animalDesc", updatedAnimalData.Desc);
+                command.Parameters.AddWithValue("@animalCategory", updatedAnimalData.Category);
+                command.Parameters.AddWithValue("@animalArea", updatedAnimalData.Area);
+                command.Parameters.AddWithValue("@idAnimal", idAnimal);
+
+                int rowsAffected = command.ExecuteNonQuery();
+
+                if (rowsAffected == 0)
+                {
+                    return NotFound("Animal with the specified IdAnimal was not found.");
+                }
+            }
+        }
+
+        return Ok();
+    }
+
+    [HttpDelete("{idAnimal}")]
+    public IActionResult DeleteAnimal(int idAnimal)
+    {
+        using (SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default")))
+        {
+            connection.Open();
+
+            using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = connection;
+                command.CommandText = "DELETE FROM Animal WHERE IdAnimal = @idAnimal";
+                command.Parameters.AddWithValue("@idAnimal", idAnimal);
+
+                int rowsAffected = command.ExecuteNonQuery();
+
+                if (rowsAffected == 0)
+                {
+                    return NotFound("Animal with the specified IdAnimal was not found.");
+                }
+            }
+        }
+
+        return Ok();
+    }
+
+    
 }
